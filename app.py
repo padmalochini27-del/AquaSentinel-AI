@@ -1,90 +1,314 @@
+```python
 import streamlit as st
 import pandas as pd
 import numpy as np
 
-# Page configuration
+# --------------------------------------------------
+# PAGE CONFIGURATION
+# --------------------------------------------------
 st.set_page_config(
     page_title="AquaSentinel AI",
     page_icon="💧",
     layout="wide"
 )
 
-# Title
+# --------------------------------------------------
+# HEADER
+# --------------------------------------------------
 st.title("💧 AquaSentinel AI")
 st.subheader("AI-Powered Water Leak Detection & Monitoring System")
 
 st.write(
-    "Monitor water flow and pressure, detect abnormal patterns, "
-    "and identify potential leaks using AI."
+    "A smart monitoring platform that analyzes water flow and pressure "
+    "to identify abnormal patterns and detect potential pipeline leaks."
 )
 
-# Dashboard metrics
+# --------------------------------------------------
+# SIDEBAR
+# --------------------------------------------------
+st.sidebar.header("⚙️ Monitoring Controls")
+
+simulation = st.sidebar.selectbox(
+    "Simulation Mode",
+    ["Normal Operation", "Simulate Leak", "High Flow Warning"]
+)
+
+st.sidebar.info(
+    "Use Simulation Mode to demonstrate how AquaSentinel AI "
+    "responds to abnormal water conditions."
+)
+
+# --------------------------------------------------
+# SENSOR VALUES
+# --------------------------------------------------
+if simulation == "Normal Operation":
+    flow = 42
+    pressure = 3.2
+    leak_probability = 8
+    status = "🟢 NORMAL"
+
+elif simulation == "Simulate Leak":
+    flow = 87
+    pressure = 1.8
+    leak_probability = 94
+    status = "🔴 LEAK DETECTED"
+
+else:
+    flow = 68
+    pressure = 3.0
+    leak_probability = 38
+    status = "🟡 WARNING"
+
+# --------------------------------------------------
+# DASHBOARD METRICS
+# --------------------------------------------------
+st.header("📊 System Overview")
+
 col1, col2, col3, col4 = st.columns(4)
 
 with col1:
-    st.metric("Water Flow", "42 L/min")
+    st.metric(
+        "Water Flow",
+        f"{flow} L/min",
+        "Normal: 30–60 L/min"
+    )
 
 with col2:
-    st.metric("Pressure", "3.2 bar")
+    st.metric(
+        "Pipeline Pressure",
+        f"{pressure} bar",
+        "Expected: 2.5–4.5 bar"
+    )
 
 with col3:
-    st.metric("Leak Probability", "8%")
+    st.metric(
+        "Leak Probability",
+        f"{leak_probability}%"
+    )
 
 with col4:
-    st.metric("System Status", "🟢 Normal")
+    st.metric(
+        "System Status",
+        status
+    )
 
 st.divider()
 
-# Sensor monitoring section
-st.header("📊 Sensor Monitoring")
-
-flow = st.slider(
-    "Water Flow (L/min)",
-    min_value=0,
-    max_value=100,
-    value=42
-)
-
-pressure = st.slider(
-    "Water Pressure (bar)",
-    min_value=0.0,
-    max_value=10.0,
-    value=3.2
-)
-
-st.write("### Current Sensor Readings")
+# --------------------------------------------------
+# SENSOR MONITORING
+# --------------------------------------------------
+st.header("🌊 Sensor Monitoring")
 
 sensor_data = pd.DataFrame({
-    "Sensor": ["Water Flow", "Water Pressure"],
-    "Value": [flow, pressure],
-    "Unit": ["L/min", "bar"]
+    "Sensor": [
+        "Water Flow Sensor",
+        "Pressure Sensor",
+        "Leak Detection Engine"
+    ],
+    "Reading": [
+        f"{flow} L/min",
+        f"{pressure} bar",
+        f"{leak_probability}% probability"
+    ],
+    "Status": [
+        "Normal" if flow <= 60 else "Abnormal",
+        "Normal" if pressure >= 2.5 else "Abnormal",
+        status
+    ]
 })
 
-st.dataframe(sensor_data, use_container_width=True)
+st.dataframe(
+    sensor_data,
+    use_container_width=True,
+    hide_index=True
+)
 
-# Simple initial leak logic
-st.header("🚨 Leak Detection")
+# --------------------------------------------------
+# LEAK DETECTION ENGINE
+# --------------------------------------------------
+st.header("🤖 AI Leak Detection")
 
-if flow > 75 and pressure < 2.5:
-    st.error("🚨 Possible Water Leak Detected!")
-    st.warning("Abnormal combination of high flow and low pressure.")
-elif flow > 60:
-    st.warning("⚠️ Unusual Water Flow Detected")
+if simulation == "Simulate Leak":
+
+    st.error("🚨 PIPELINE LEAK DETECTED")
+
+    st.write(
+        "The system identified an abnormal combination of "
+        "high water flow and reduced pipeline pressure."
+    )
+
+    st.warning(
+        "Recommended Action: Inspect the affected pipeline section "
+        "and isolate the water supply if necessary."
+    )
+
+elif simulation == "High Flow Warning":
+
+    st.warning("⚠️ ABNORMAL WATER FLOW")
+
+    st.write(
+        "Water flow is higher than the expected operating range. "
+        "The system recommends continued monitoring."
+    )
+
 else:
-    st.success("✅ No Leak Detected")
 
-# Information section
+    st.success("✅ SYSTEM OPERATING NORMALLY")
+
+    st.write(
+        "Current flow and pressure values are within the expected "
+        "operating range."
+    )
+
+# --------------------------------------------------
+# ANOMALY SCORE
+# --------------------------------------------------
+st.header("📈 Anomaly Analysis")
+
+normal_flow = 45
+normal_pressure = 3.5
+
+flow_anomaly = abs(flow - normal_flow) / normal_flow
+pressure_anomaly = abs(pressure - normal_pressure) / normal_pressure
+
+anomaly_score = min(
+    100,
+    int((flow_anomaly + pressure_anomaly) * 50)
+)
+
+st.progress(anomaly_score / 100)
+
+st.write(f"**Anomaly Score: {anomaly_score}/100**")
+
+if anomaly_score >= 60:
+    st.error("High anomaly detected — immediate inspection recommended.")
+elif anomaly_score >= 30:
+    st.warning("Moderate anomaly detected — continue monitoring.")
+else:
+    st.success("Low anomaly — system conditions appear normal.")
+
+# --------------------------------------------------
+# SIMULATED SENSOR TREND
+# --------------------------------------------------
+st.header("📉 Sensor Trend")
+
+time = pd.date_range(
+    start="2026-08-27 18:00",
+    periods=20,
+    freq="5min"
+)
+
+if simulation == "Simulate Leak":
+
+    flow_values = np.concatenate([
+        np.random.normal(42, 2, 12),
+        np.random.normal(85, 4, 8)
+    ])
+
+    pressure_values = np.concatenate([
+        np.random.normal(3.4, 0.15, 12),
+        np.random.normal(1.8, 0.15, 8)
+    ])
+
+elif simulation == "High Flow Warning":
+
+    flow_values = np.random.normal(68, 3, 20)
+    pressure_values = np.random.normal(3.0, 0.15, 20)
+
+else:
+
+    flow_values = np.random.normal(42, 2, 20)
+    pressure_values = np.random.normal(3.3, 0.15, 20)
+
+trend_data = pd.DataFrame({
+    "Time": time,
+    "Water Flow (L/min)": flow_values,
+    "Pressure (bar)": pressure_values
+})
+
+st.line_chart(
+    trend_data.set_index("Time")
+)
+
+# --------------------------------------------------
+# ALERT CENTER
+# --------------------------------------------------
+st.header("🚨 Alert Center")
+
+if simulation == "Simulate Leak":
+
+    alert_data = pd.DataFrame({
+        "Time": ["Current"],
+        "Alert": ["Pipeline Leak Detected"],
+        "Severity": ["CRITICAL"],
+        "Action": ["Inspect Pipeline"]
+    })
+
+    st.dataframe(
+        alert_data,
+        use_container_width=True,
+        hide_index=True
+    )
+
+elif simulation == "High Flow Warning":
+
+    alert_data = pd.DataFrame({
+        "Time": ["Current"],
+        "Alert": ["High Water Flow"],
+        "Severity": ["MEDIUM"],
+        "Action": ["Monitor System"]
+    })
+
+    st.dataframe(
+        alert_data,
+        use_container_width=True,
+        hide_index=True
+    )
+
+else:
+
+    st.success("No active alerts.")
+
+# --------------------------------------------------
+# SYSTEM ARCHITECTURE
+# --------------------------------------------------
+st.divider()
+
+st.header("🏗️ AquaSentinel AI Architecture")
+
+st.write(
+    """
+    **Sensor Layer → Data Processing → Anomaly Detection → "
+    "Leak Probability → Alert System → User Dashboard**
+    """
+)
+
+st.write(
+    "The prototype currently uses simulated sensor data. "
+    "The architecture is designed to support real flow and pressure "
+    "sensors in a future deployment."
+)
+
+# --------------------------------------------------
+# ABOUT
+# --------------------------------------------------
 st.divider()
 
 st.header("ℹ️ About AquaSentinel AI")
 
 st.write(
     """
-    AquaSentinel AI is an intelligent water monitoring system designed
-    to detect possible pipeline leaks by analyzing sensor data such as
-    water flow and pressure.
+    AquaSentinel AI is an intelligent water monitoring solution "
+    "designed to detect potential pipeline leaks by analyzing "
+    "water-flow and pressure patterns.
 
-    The system can later be enhanced with a machine learning model
-    trained on historical sensor data to detect abnormal patterns.
+    Instead of relying only on manual inspection, the system "
+    "continuously evaluates sensor readings and identifies "
+    "abnormal conditions that may indicate a leak.
+
+    The prototype includes simulated sensor data, anomaly scoring, "
+    "leak probability estimation, trend visualization, and an "
+    "automated alert mechanism.
     """
 )
+```
