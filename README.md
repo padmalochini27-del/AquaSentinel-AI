@@ -172,6 +172,17 @@ Potential approaches include:
 
 The ML model could learn normal pipeline behavior and identify deviations automatically.
 
+### Machine Learning Prototype
+
+AquaSentinel AI includes an Isolation Forest anomaly-detection model
+trained on normal water-flow and pressure patterns.
+
+The model identifies sensor combinations that differ significantly
+from normal operating conditions and produces an anomaly score.
+
+The architecture can later be extended using real historical
+sensor datasets for improved leak detection accuracy.
+
 ---
 
 ## 📊 Monitoring Parameters
