@@ -243,7 +243,7 @@ if st.button("🔍 Run AI Assessment", use_container_width=True):
         st.json(
             workflow_result["qdrant_memory"]
         )
-         st.write("### 🧠 Qdrant Memory Write-Back")
+        st.write("### 🧠 Qdrant Memory Write-Back")
 
         if workflow_result["memory_write"]["stored"]:
             st.success(
