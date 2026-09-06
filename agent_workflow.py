@@ -1,6 +1,11 @@
 import os
 import json
 import numpy as np
+
+# NEW: real trained ML model (IsolationForest) as a second, independent signal
+from ml_model import detect_anomaly, get_anomaly_score
+
+
 def get_secret(name):
     value = os.getenv(name)
 
@@ -68,7 +73,7 @@ def rule_based_detection(flow, pressure):
 
 
 # -----------------------------
-# ML DETECTION
+# ML DETECTION (deviation-based heuristic)
 # -----------------------------
 
 def ml_detection(flow, pressure):
@@ -91,6 +96,37 @@ def ml_detection(flow, pressure):
         "anomaly_score": round(score, 2),
         "anomaly": score >= 35
     }
+
+
+# -----------------------------
+# ML MODEL DETECTION (trained IsolationForest -- second, independent signal)
+# -----------------------------
+
+def ml_model_detection(flow, pressure):
+    """
+    Runs the trained IsolationForest model from ml_model.py as a
+    second, independent anomaly signal alongside the deviation-based
+    ml_detection() above. This is a genuinely trained unsupervised
+    ML model, not a hand-written formula.
+    """
+
+    try:
+        prediction = detect_anomaly(flow, pressure)
+        score = get_anomaly_score(flow, pressure)
+
+        return {
+            "available": True,
+            "prediction": "anomaly" if prediction == -1 else "normal",
+            "anomaly_score": score
+        }
+
+    except Exception as e:
+        return {
+            "available": False,
+            "prediction": "unknown",
+            "anomaly_score": None,
+            "message": f"ml_model error: {str(e)}"
+        }
 
 
 # -----------------------------
@@ -321,9 +357,9 @@ def retrieve_historical_context(flow, pressure):
 # LYZR AGENT
 # -----------------------------
 
-def run_lyzr_agent(sensor_data, ml_result, rule_result, memory):
+def run_lyzr_agent(sensor_data, ml_result, ml_model_result, rule_result, memory):
     """
-    Lyzr harmonizes ML detection, rule detection,
+    Lyzr harmonizes ML detection (both signals), rule detection,
     and historical context into one assessment.
     """
 
@@ -351,9 +387,10 @@ def run_lyzr_agent(sensor_data, ml_result, rule_result, memory):
             goal="Analyze sensor anomalies and produce safe actionable incident assessments",
             instructions=(
                 "You analyze water pipeline sensor conditions. "
-                "Combine ML anomaly results, rule-based alerts, and historical "
-                "incident context. Do not invent sensor evidence. "
-                "If ML and rules conflict, recommend human review. "
+                "Combine the deviation-based ML anomaly score, the trained "
+                "IsolationForest ML model result, rule-based alerts, and "
+                "historical incident context. Do not invent sensor evidence. "
+                "If the signals conflict, recommend human review. "
                 "Return a concise assessment containing severity, likely cause, "
                 "recommended action, and confidence."
             ),
@@ -366,8 +403,11 @@ AquaSentinel AI incident:
 Sensor data:
 {json.dumps(sensor_data)}
 
-ML detection:
+ML detection (deviation-based):
 {json.dumps(ml_result)}
+
+ML model detection (trained IsolationForest):
+{json.dumps(ml_model_result)}
 
 Rule detection:
 {json.dumps(rule_result)}
@@ -461,6 +501,9 @@ def run_aquasentinel_workflow(flow, pressure):
 
     ml_result = ml_detection(flow, pressure)
 
+    # NEW: second, independent ML signal from the trained IsolationForest model
+    ml_model_result = ml_model_detection(flow, pressure)
+
     rule_result = rule_based_detection(flow, pressure)
 
     conflict = (
@@ -477,6 +520,7 @@ def run_aquasentinel_workflow(flow, pressure):
     lyzr_result = run_lyzr_agent(
         sensor_data,
         ml_result,
+        ml_model_result,
         rule_result,
         memory
     )
@@ -487,6 +531,9 @@ def run_aquasentinel_workflow(flow, pressure):
     )
 
     # Determine final system status
+    # NOTE: final_status logic is UNCHANGED from the working version --
+    # ml_model_result is surfaced as additional evidence/context only,
+    # so it cannot break the already-tested leak/normal detection.
     if conflict:
         final_status = "HUMAN REVIEW REQUIRED"
 
@@ -530,6 +577,7 @@ def run_aquasentinel_workflow(flow, pressure):
     return {
         "sensor_data": sensor_data,
         "ml_result": ml_result,
+        "ml_model_result": ml_model_result,
         "rule_result": rule_result,
         "memory_write": memory_write,
         "conflict": conflict,
@@ -537,6 +585,4 @@ def run_aquasentinel_workflow(flow, pressure):
         "lyzr": lyzr_result,
         "enkrypt": enkrypt_result,
         "final_status": final_status
-    }        
-
-
+    }
