@@ -149,7 +149,7 @@ def retrieve_historical_context(flow, pressure):
     try:
         results = client.query_points(
             collection_name=collection_name,
-            query=vector,
+            query=("sensor_vector", vector),
             limit=5
         ).points
 
