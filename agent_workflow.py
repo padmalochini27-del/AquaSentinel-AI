@@ -1,6 +1,17 @@
 import os
 import json
 import numpy as np
+def get_secret(name):
+    value = os.getenv(name)
+
+    if value:
+        return value
+
+    try:
+        import streamlit as st
+        return st.secrets.get(name)
+    except Exception:
+        return None
 
 # -----------------------------
 # OPTIONAL AI SERVICE IMPORTS
