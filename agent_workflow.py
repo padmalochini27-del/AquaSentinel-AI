@@ -447,9 +447,6 @@ def enkrypt_check(text):
             "safe": True,
             "message": f"Enkrypt error: {str(e)}"
         }
-        
-
-
 # -----------------------------
 # COMPLETE WORKFLOW
 # -----------------------------
@@ -470,11 +467,13 @@ def run_aquasentinel_workflow(flow, pressure):
         ml_result["anomaly"] != (rule_result["status"] == "ALERT")
     )
 
+    # Retrieve historical context from Qdrant
     memory = retrieve_historical_context(
         flow,
         pressure
     )
 
+    # Lyzr decision agent
     lyzr_result = run_lyzr_agent(
         sensor_data,
         ml_result,
@@ -482,55 +481,62 @@ def run_aquasentinel_workflow(flow, pressure):
         memory
     )
 
+    # Enkrypt security check
     enkrypt_result = enkrypt_check(
         lyzr_result["assessment"]
     )
 
+    # Determine final system status
     if conflict:
-    final_status = "HUMAN REVIEW REQUIRED"
-elif not enkrypt_result["safe"]:
-    final_status = "BLOCKED BY SECURITY GUARDRAIL"
-elif ml_result["anomaly"] or rule_result["status"] == "ALERT":
-    final_status = "LEAK / ANOMALY DETECTED"
-else:
-    final_status = "NORMAL"
+        final_status = "HUMAN REVIEW REQUIRED"
 
+    elif not enkrypt_result["safe"]:
+        final_status = "BLOCKED BY SECURITY GUARDRAIL"
 
-# -----------------------------
-# QDRANT MEMORY WRITE-BACK
-# -----------------------------
+    elif ml_result["anomaly"] or rule_result["status"] == "ALERT":
+        final_status = "LEAK / ANOMALY DETECTED"
 
-memory_write = {
-    "available": False,
-    "stored": False,
-    "message": "No incident stored."
-}
+    else:
+        final_status = "NORMAL"
 
-if final_status == "LEAK / ANOMALY DETECTED":
+    # -----------------------------
+    # QDRANT MEMORY WRITE-BACK
+    # -----------------------------
 
-    incident_type = "Pipeline Leak"
-    severity = "CRITICAL"
+    memory_write = {
+        "available": False,
+        "stored": False,
+        "message": "No incident stored."
+    }
 
-    if rule_result["status"] == "ALERT":
+    if final_status == "LEAK / ANOMALY DETECTED":
+
+        incident_type = "Pipeline Leak"
         severity = "CRITICAL"
 
-    memory_write = store_incident_memory(
-        flow=flow,
-        pressure=pressure,
-        incident_type=incident_type,
-        severity=severity,
-        zone="Zone A",
-        anomaly_score=ml_result["anomaly_score"]
-    )
+        memory_write = store_incident_memory(
+            flow=flow,
+            pressure=pressure,
+            incident_type=incident_type,
+            severity=severity,
+            zone="Zone A",
+            anomaly_score=ml_result["anomaly_score"]
+        )
+
+    # -----------------------------
+    # FINAL WORKFLOW RESULT
+    # -----------------------------
 
     return {
-      "sensor_data": sensor_data,
-      "ml_result": ml_result,
-      "rule_result": rule_result,
-      "memory_write": memory_write,
-      "conflict": conflict,
-      "qdrant_memory": memory,
-      "lyzr": lyzr_result,
-      "enkrypt": enkrypt_result,
-      "final_status": final_status
-    }
+        "sensor_data": sensor_data,
+        "ml_result": ml_result,
+        "rule_result": rule_result,
+        "memory_write": memory_write,
+        "conflict": conflict,
+        "qdrant_memory": memory,
+        "lyzr": lyzr_result,
+        "enkrypt": enkrypt_result,
+        "final_status": final_status
+    }        
+
+
