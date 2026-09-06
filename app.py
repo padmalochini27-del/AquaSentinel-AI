@@ -1,7 +1,8 @@
 import streamlit as st
 from agent_workflow import (
     run_aquasentinel_workflow,
-    seed_historical_incidents
+    seed_historical_incidents,
+    ml_detection  # NEW: reuse the same scoring function everywhere
 )
 import pandas as pd
 import numpy as np
@@ -47,20 +48,23 @@ st.sidebar.info(
 if simulation == "Normal Operation":
     flow = 42
     pressure = 3.2
-    leak_probability = 8
     status = "🟢 NORMAL"
 
 elif simulation == "Simulate Leak":
     flow = 87
     pressure = 1.8
-    leak_probability = 94
     status = "🔴 LEAK DETECTED"
 
 else:
     flow = 68
     pressure = 3.0
-    leak_probability = 38
     status = "🟡 WARNING"
+
+# FIX: leak_probability is now computed the same way the AI workflow
+# computes it, instead of being a separate hardcoded number. This is
+# the exact same ml_detection() function that "Run AI Assessment" uses,
+# so the top-of-page metric and the AI's own score can never disagree.
+leak_probability = round(ml_detection(flow, pressure)["anomaly_score"], 1)
 
 # --------------------------------------------------
 # DASHBOARD METRICS
@@ -94,6 +98,11 @@ with col4:
         "System Status",
         status
     )
+
+st.caption(
+    "Leak Probability is the same anomaly score produced by the AI "
+    "workflow below (ML anomaly detection) — not a separate estimate."
+)
 
 st.divider()
 
@@ -225,6 +234,13 @@ if st.button("🔍 Run AI Assessment", use_container_width=True):
             workflow_result["rule_result"]
         )
 
+        if workflow_result["conflict"]:
+            st.warning(
+                "⚠️ ML detection and rule-based detection disagree on "
+                "this reading — the system escalates to human review "
+                "instead of forcing a single automated answer."
+            )
+
         st.write("### 3️⃣ Qdrant Historical Memory")
 
         if workflow_result["qdrant_memory"]["available"]:
@@ -276,6 +292,11 @@ if st.button("🔍 Run AI Assessment", use_container_width=True):
         )
 
         st.write("### 5️⃣ Enkrypt Security Guardrail")
+        st.caption(
+            "Enkrypt AI validates the Lyzr agent's generated assessment "
+            "text before it is shown or stored — it is an output-side "
+            "safety check on the AI's own reasoning."
+        )
 
         if workflow_result["enkrypt"]["available"]:
 
@@ -343,16 +364,12 @@ else:
 # --------------------------------------------------
 st.header("📈 Anomaly Analysis")
 
-normal_flow = 45
-normal_pressure = 3.5
-
-flow_anomaly = abs(flow - normal_flow) / normal_flow
-pressure_anomaly = abs(pressure - normal_pressure) / normal_pressure
-
-anomaly_score = min(
-    100,
-    int((flow_anomaly + pressure_anomaly) * 50)
-)
+# FIX: reuse the same anomaly_score computed above (from ml_detection)
+# instead of a second, independently-computed anomaly_score. Previously
+# this section used different constants (normal_flow=45, normal_pressure=3.5)
+# than ml_detection() (43.0, 3.4), which could disagree with the AI's
+# own number. Now both sections always show the identical score.
+anomaly_score = leak_probability
 
 st.progress(anomaly_score / 100)
 
@@ -465,17 +482,26 @@ st.divider()
 
 st.header("🏗️ AquaSentinel AI Architecture")
 
+# FIX: this previously described a completely different, simpler
+# pipeline that didn't mention Lyzr, Qdrant, or Enkrypt AI at all.
+# It now matches what run_aquasentinel_workflow() actually does.
 st.write(
     """
-    **Sensor Layer → Data Processing → Anomaly Detection →
-    Leak Probability → Alert System → User Dashboard**
+    **Sensor Data → ML Anomaly Detection + Rule-Based Detection →
+    Qdrant Historical Incident Retrieval → Lyzr AI Decision Agent →
+    Enkrypt AI Security Guardrail (output check) → Final Assessment →
+    Qdrant Memory Write-Back**
     """
 )
 
 st.write(
-    "The prototype currently uses simulated sensor data. "
-    "The architecture is designed to support real flow and pressure "
-    "sensors in a future deployment."
+    "The prototype currently uses simulated sensor data. ML anomaly "
+    "scoring and rule-based checks run locally; Qdrant provides "
+    "long-term incident memory and retrieval; Lyzr's agent produces "
+    "the unified incident assessment; and Enkrypt AI screens that "
+    "generated assessment before it is shown or stored. When the ML "
+    "and rule-based checks disagree, the system escalates to human "
+    "review rather than forcing an automated decision."
 )
 
 # --------------------------------------------------
@@ -497,6 +523,9 @@ st.write(
 
     The prototype includes simulated sensor data, anomaly scoring,
     leak probability estimation, trend visualization, an automated
-    alert mechanism, and an AI-assisted incident assessment workflow.
+    alert mechanism, and an AI-assisted incident assessment workflow
+    combining rule-based detection, ML anomaly scoring, Qdrant
+    historical memory, a Lyzr decision agent, and an Enkrypt AI
+    security guardrail.
     """
 )
