@@ -1,1 +1,337 @@
+import os
+import json
+import numpy as np
 
+# -----------------------------
+# OPTIONAL AI SERVICE IMPORTS
+# -----------------------------
+
+try:
+    from lyzr import Studio
+    LYZR_AVAILABLE = True
+except Exception:
+    LYZR_AVAILABLE = False
+
+try:
+    from qdrant_client import QdrantClient, models
+    QDRANT_AVAILABLE = True
+except Exception:
+    QDRANT_AVAILABLE = False
+
+try:
+    from enkryptai_sdk import guardrails_client
+    ENKRYPT_AVAILABLE = True
+except Exception:
+    ENKRYPT_AVAILABLE = False
+
+
+# -----------------------------
+# RULE-BASED DETECTION
+# -----------------------------
+
+def rule_based_detection(flow, pressure):
+    """
+    Critical rule-based checks for pipeline conditions.
+    """
+
+    alerts = []
+
+    if pressure < 2.0 and flow > 70:
+        alerts.append("Critical pressure drop with unusually high flow")
+
+    if flow > 80:
+        alerts.append("High flow condition detected")
+
+    if pressure < 2.2:
+        alerts.append("Low pressure condition detected")
+
+    if alerts:
+        return {
+            "status": "ALERT",
+            "alerts": alerts
+        }
+
+    return {
+        "status": "NORMAL",
+        "alerts": []
+    }
+
+
+# -----------------------------
+# ML DETECTION
+# -----------------------------
+
+def ml_detection(flow, pressure):
+    """
+    Lightweight anomaly score based on the existing
+    sensor operating range.
+    """
+
+    normal_flow = 43.0
+    normal_pressure = 3.4
+
+    flow_deviation = abs(flow - normal_flow) / normal_flow
+    pressure_deviation = abs(pressure - normal_pressure) / normal_pressure
+
+    score = (flow_deviation * 0.5 + pressure_deviation * 0.5) * 100
+
+    score = float(np.clip(score, 0, 100))
+
+    return {
+        "anomaly_score": round(score, 2),
+        "anomaly": score >= 35
+    }
+
+
+# -----------------------------
+# QDRANT MEMORY
+# -----------------------------
+
+def get_qdrant_client():
+    if not QDRANT_AVAILABLE:
+        return None
+
+    url = os.getenv("QDRANT_URL")
+    api_key = os.getenv("QDRANT_API_KEY")
+
+    if not url:
+        return None
+
+    return QdrantClient(
+        url=url,
+        api_key=api_key
+    )
+
+
+def create_sensor_vector(flow, pressure):
+    """
+    Small deterministic vector representing the
+    current sensor pattern.
+    """
+
+    vector = [
+        flow / 100.0,
+        pressure / 5.0,
+        abs(flow - 43.0) / 100.0,
+        abs(pressure - 3.4) / 5.0
+    ]
+
+    return vector
+
+
+def retrieve_historical_context(flow, pressure):
+    """
+    Retrieve similar historical incidents from Qdrant.
+    """
+
+    client = get_qdrant_client()
+
+    if client is None:
+        return {
+            "available": False,
+            "matches": []
+        }
+
+    collection_name = "aquasentinel_incidents"
+    vector = create_sensor_vector(flow, pressure)
+
+    try:
+        results = client.query_points(
+            collection_name=collection_name,
+            query=vector,
+            limit=5
+        ).points
+
+        matches = []
+
+        for result in results:
+            matches.append({
+                "score": round(float(result.score), 3),
+                "incident": result.payload
+            })
+
+        return {
+            "available": True,
+            "matches": matches
+        }
+
+    except Exception as e:
+        return {
+            "available": False,
+            "matches": [],
+            "error": str(e)
+        }
+
+
+# -----------------------------
+# LYZR AGENT
+# -----------------------------
+
+def run_lyzr_agent(sensor_data, ml_result, rule_result, memory):
+    """
+    Lyzr harmonizes ML detection, rule detection,
+    and historical context into one assessment.
+    """
+
+    if not LYZR_AVAILABLE:
+        return {
+            "available": False,
+            "assessment": "Lyzr is not configured yet."
+        }
+
+    api_key = os.getenv("LYZR_API_KEY")
+
+    if not api_key:
+        return {
+            "available": False,
+            "assessment": "LYZR_API_KEY is not configured."
+        }
+
+    try:
+        studio = Studio(api_key=api_key)
+
+        agent = studio.create_agent(
+            name="AquaSentinel Decision Agent",
+            provider="gpt-4o",
+            role="Water infrastructure incident decision agent",
+            goal="Analyze sensor anomalies and produce safe actionable incident assessments",
+            instructions=(
+                "You analyze water pipeline sensor conditions. "
+                "Combine ML anomaly results, rule-based alerts, and historical "
+                "incident context. Do not invent sensor evidence. "
+                "If ML and rules conflict, recommend human review. "
+                "Return a concise assessment containing severity, likely cause, "
+                "recommended action, and confidence."
+            ),
+            temperature=0.2
+        )
+
+        prompt = f"""
+AquaSentinel AI incident:
+
+Sensor data:
+{json.dumps(sensor_data)}
+
+ML detection:
+{json.dumps(ml_result)}
+
+Rule detection:
+{json.dumps(rule_result)}
+
+Historical Qdrant context:
+{json.dumps(memory)}
+
+Produce a unified incident assessment.
+"""
+
+        response = agent.run(prompt)
+
+        return {
+            "available": True,
+            "assessment": response.response
+        }
+
+    except Exception as e:
+        return {
+            "available": False,
+            "assessment": f"Lyzr error: {str(e)}"
+        }
+
+
+# -----------------------------
+# ENKRYPT GUARDRAIL
+# -----------------------------
+
+def enkrypt_check(text):
+    """
+    Security check using Enkrypt AI.
+    """
+
+    if not ENKRYPT_AVAILABLE:
+        return {
+            "available": False,
+            "safe": True,
+            "message": "Enkrypt SDK is not configured yet."
+        }
+
+    api_key = os.getenv("ENKRYPTAI_API_KEY")
+
+    if not api_key:
+        return {
+            "available": False,
+            "safe": True,
+            "message": "ENKRYPTAI_API_KEY is not configured."
+        }
+
+    try:
+        result = guardrails_client.detect(text)
+
+        return {
+            "available": True,
+            "safe": bool(result.is_safe),
+            "violations": getattr(result, "violations", [])
+        }
+
+    except Exception as e:
+        return {
+            "available": False,
+            "safe": True,
+            "message": f"Enkrypt error: {str(e)}"
+        }
+
+
+# -----------------------------
+# COMPLETE WORKFLOW
+# -----------------------------
+
+def run_aquasentinel_workflow(flow, pressure):
+
+    sensor_data = {
+        "flow_lpm": flow,
+        "pressure_bar": pressure,
+        "zone": "Zone A"
+    }
+
+    ml_result = ml_detection(flow, pressure)
+
+    rule_result = rule_based_detection(flow, pressure)
+
+    conflict = (
+        ml_result["anomaly"] != (rule_result["status"] == "ALERT")
+    )
+
+    memory = retrieve_historical_context(
+        flow,
+        pressure
+    )
+
+    lyzr_result = run_lyzr_agent(
+        sensor_data,
+        ml_result,
+        rule_result,
+        memory
+    )
+
+    enkrypt_result = enkrypt_check(
+        lyzr_result["assessment"]
+    )
+
+    if conflict:
+        final_status = "HUMAN REVIEW REQUIRED"
+    elif not enkrypt_result["safe"]:
+        final_status = "BLOCKED BY SECURITY GUARDRAIL"
+    elif ml_result["anomaly"] or rule_result["status"] == "ALERT":
+        final_status = "LEAK / ANOMALY DETECTED"
+    else:
+        final_status = "NORMAL"
+
+    return {
+        "sensor_data": sensor_data,
+        "ml_result": ml_result,
+        "rule_result": rule_result,
+        "conflict": conflict,
+        "qdrant_memory": memory,
+        "lyzr": lyzr_result,
+        "enkrypt": enkrypt_result,
+        "final_status": final_status
+    }
