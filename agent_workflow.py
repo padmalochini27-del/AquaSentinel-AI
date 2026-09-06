@@ -30,11 +30,10 @@ except Exception:
     QDRANT_AVAILABLE = False
 
 try:
-    from enkryptai_sdk import guardrails_client
+    from enkryptai_sdk import GuardrailsClient
     ENKRYPT_AVAILABLE = True
 except Exception:
     ENKRYPT_AVAILABLE = False
-
 
 # -----------------------------
 # RULE-BASED DETECTION
@@ -255,15 +254,11 @@ Produce a unified incident assessment.
 # -----------------------------
 
 def enkrypt_check(text):
-    """
-    Security check using Enkrypt AI.
-    """
-
     if not ENKRYPT_AVAILABLE:
         return {
             "available": False,
             "safe": True,
-            "message": "Enkrypt SDK is not configured yet."
+            "message": "Enkrypt SDK is not installed or could not be imported."
         }
 
     api_key = get_secret("ENKRYPTAI_API_KEY")
@@ -276,12 +271,31 @@ def enkrypt_check(text):
         }
 
     try:
-        result = guardrails_client.detect(text)
+        client = GuardrailsClient(
+            api_key=api_key,
+            base_url="https://api.enkryptai.com"
+        )
+
+        result = client.detect(text=text)
+
+        # Support SDK response formats
+        if hasattr(result, "is_safe"):
+            safe_value = result.is_safe
+            if callable(safe_value):
+                safe_value = safe_value()
+
+        else:
+            safe_value = True
+
+        violations = []
+
+        if hasattr(result, "get_violations"):
+            violations = result.get_violations()
 
         return {
             "available": True,
-            "safe": bool(result.is_safe),
-            "violations": getattr(result, "violations", [])
+            "safe": bool(safe_value),
+            "violations": violations
         }
 
     except Exception as e:
@@ -290,6 +304,7 @@ def enkrypt_check(text):
             "safe": True,
             "message": f"Enkrypt error: {str(e)}"
         }
+        
 
 
 # -----------------------------
