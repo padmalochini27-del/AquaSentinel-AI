@@ -1,5 +1,8 @@
 import streamlit as st
-from agent_workflow import run_aquasentinel_workflow
+from agent_workflow import (
+    run_aquasentinel_workflow,
+    seed_historical_incidents
+)
 import pandas as pd
 import numpy as np
 
@@ -136,6 +139,10 @@ st.write(
 )
 
 if st.button("🔍 Run AI Assessment", use_container_width=True):
+
+    with st.spinner("Loading historical incident memory..."):
+
+        seed_result = seed_historical_incidents()
 
     with st.spinner("Analyzing sensor conditions..."):
 
