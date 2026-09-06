@@ -91,8 +91,8 @@ def get_qdrant_client():
     if not QDRANT_AVAILABLE:
         return None
 
-    url = os.getenv("QDRANT_URL")
-    api_key = os.getenv("QDRANT_API_KEY")
+    url = get_secret("QDRANT_URL")
+    api_key = get_secret("QDRANT_API_KEY")
 
     if not url:
         return None
@@ -179,7 +179,7 @@ def run_lyzr_agent(sensor_data, ml_result, rule_result, memory):
             "assessment": "Lyzr is not configured yet."
         }
 
-    api_key = os.getenv("LYZR_API_KEY")
+    api_key = get_secret("LYZR_API_KEY")
 
     if not api_key:
         return {
@@ -254,7 +254,7 @@ def enkrypt_check(text):
             "message": "Enkrypt SDK is not configured yet."
         }
 
-    api_key = os.getenv("ENKRYPTAI_API_KEY")
+    api_key = get_secret("ENKRYPTAI_API_KEY")
 
     if not api_key:
         return {
