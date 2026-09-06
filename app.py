@@ -243,6 +243,19 @@ if st.button("🔍 Run AI Assessment", use_container_width=True):
         st.json(
             workflow_result["qdrant_memory"]
         )
+         st.write("### 🧠 Qdrant Memory Write-Back")
+
+        if workflow_result["memory_write"]["stored"]:
+            st.success(
+                "New incident successfully stored in Qdrant memory."
+            )
+            st.json(
+                workflow_result["memory_write"]
+            )
+        else:
+            st.info(
+                workflow_result["memory_write"]["message"]
+            )
 
         st.write("### 4️⃣ Lyzr Decision Agent")
 
