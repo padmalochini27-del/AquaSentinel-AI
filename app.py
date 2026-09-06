@@ -1,5 +1,5 @@
-```python
 import streamlit as st
+from agent_workflow import run_aquasentinel_workflow
 import pandas as pd
 import numpy as np
 
@@ -124,6 +124,164 @@ st.dataframe(
 )
 
 # --------------------------------------------------
+# AI AGENT INCIDENT ASSESSMENT
+# --------------------------------------------------
+st.divider()
+
+st.header("🧠 AI Agent Incident Assessment")
+
+st.write(
+    "The AI workflow combines anomaly analysis, rule-based detection, "
+    "historical incident context, AI reasoning, and security guardrails."
+)
+
+if st.button("🔍 Run AI Assessment", use_container_width=True):
+
+    with st.spinner("Analyzing sensor conditions..."):
+
+        workflow_result = run_aquasentinel_workflow(
+            flow,
+            pressure
+        )
+
+    final_status = workflow_result["final_status"]
+
+    # ----------------------------------------------
+    # FINAL STATUS
+    # ----------------------------------------------
+    if final_status == "NORMAL":
+
+        st.success(
+            f"✅ System Assessment: {final_status}"
+        )
+
+    elif final_status == "HUMAN REVIEW REQUIRED":
+
+        st.warning(
+            f"⚠️ System Assessment: {final_status}"
+        )
+
+    elif final_status == "BLOCKED BY SECURITY GUARDRAIL":
+
+        st.error(
+            f"🛡️ System Assessment: {final_status}"
+        )
+
+    else:
+
+        st.error(
+            f"🚨 System Assessment: {final_status}"
+        )
+
+    # ----------------------------------------------
+    # WORKFLOW METRICS
+    # ----------------------------------------------
+    col1, col2, col3 = st.columns(3)
+
+    with col1:
+        st.metric(
+            "ML Anomaly Score",
+            f'{workflow_result["ml_result"]["anomaly_score"]}%'
+        )
+
+    with col2:
+        st.metric(
+            "Rule Engine",
+            workflow_result["rule_result"]["status"]
+        )
+
+    with col3:
+
+        security_status = (
+            "SAFE"
+            if workflow_result["enkrypt"]["safe"]
+            else "BLOCKED"
+        )
+
+        st.metric(
+            "Enkrypt Security",
+            security_status
+        )
+
+    # ----------------------------------------------
+    # AI WORKFLOW DETAILS
+    # ----------------------------------------------
+    with st.expander("🔎 View AI Workflow Details"):
+
+        st.write("### 1️⃣ ML Anomaly Detection")
+        st.json(
+            workflow_result["ml_result"]
+        )
+
+        st.write("### 2️⃣ Rule-Based Detection")
+        st.json(
+            workflow_result["rule_result"]
+        )
+
+        st.write("### 3️⃣ Qdrant Historical Memory")
+
+        if workflow_result["qdrant_memory"]["available"]:
+
+            st.success(
+                "Historical incident context retrieved from Qdrant."
+            )
+
+        else:
+
+            st.info(
+                "Qdrant memory is not configured or no historical "
+                "incident collection is available."
+            )
+
+        st.json(
+            workflow_result["qdrant_memory"]
+        )
+
+        st.write("### 4️⃣ Lyzr Decision Agent")
+
+        if workflow_result["lyzr"]["available"]:
+
+            st.success(
+                "Lyzr AI decision agent completed the assessment."
+            )
+
+        else:
+
+            st.info(
+                "Lyzr is not configured yet."
+            )
+
+        st.write(
+            workflow_result["lyzr"]["assessment"]
+        )
+
+        st.write("### 5️⃣ Enkrypt Security Guardrail")
+
+        if workflow_result["enkrypt"]["available"]:
+
+            if workflow_result["enkrypt"]["safe"]:
+
+                st.success(
+                    "Enkrypt security check passed."
+                )
+
+            else:
+
+                st.error(
+                    "Enkrypt security guardrail blocked the response."
+                )
+
+        else:
+
+            st.info(
+                "Enkrypt is not configured yet."
+            )
+
+        st.json(
+            workflow_result["enkrypt"]
+        )
+
+# --------------------------------------------------
 # LEAK DETECTION ENGINE
 # --------------------------------------------------
 st.header("🤖 AI Leak Detection")
@@ -181,11 +339,22 @@ st.progress(anomaly_score / 100)
 st.write(f"**Anomaly Score: {anomaly_score}/100**")
 
 if anomaly_score >= 60:
-    st.error("High anomaly detected — immediate inspection recommended.")
+
+    st.error(
+        "High anomaly detected — immediate inspection recommended."
+    )
+
 elif anomaly_score >= 30:
-    st.warning("Moderate anomaly detected — continue monitoring.")
+
+    st.warning(
+        "Moderate anomaly detected — continue monitoring."
+    )
+
 else:
-    st.success("Low anomaly — system conditions appear normal.")
+
+    st.success(
+        "Low anomaly — system conditions appear normal."
+    )
 
 # --------------------------------------------------
 # SIMULATED SENSOR TREND
@@ -278,8 +447,8 @@ st.header("🏗️ AquaSentinel AI Architecture")
 
 st.write(
     """
-    **Sensor Layer → Data Processing → Anomaly Detection → "
-    "Leak Probability → Alert System → User Dashboard**
+    **Sensor Layer → Data Processing → Anomaly Detection →
+    Leak Probability → Alert System → User Dashboard**
     """
 )
 
@@ -298,17 +467,16 @@ st.header("ℹ️ About AquaSentinel AI")
 
 st.write(
     """
-    AquaSentinel AI is an intelligent water monitoring solution "
-    "designed to detect potential pipeline leaks by analyzing "
-    "water-flow and pressure patterns.
+    AquaSentinel AI is an intelligent water monitoring solution
+    designed to detect potential pipeline leaks by analyzing
+    water-flow and pressure patterns.
 
-    Instead of relying only on manual inspection, the system "
-    "continuously evaluates sensor readings and identifies "
-    "abnormal conditions that may indicate a leak.
+    Instead of relying only on manual inspection, the system
+    continuously evaluates sensor readings and identifies
+    abnormal conditions that may indicate a leak.
 
-    The prototype includes simulated sensor data, anomaly scoring, "
-    "leak probability estimation, trend visualization, and an "
-    "automated alert mechanism.
+    The prototype includes simulated sensor data, anomaly scoring,
+    leak probability estimation, trend visualization, an automated
+    alert mechanism, and an AI-assisted incident assessment workflow.
     """
 )
-```
