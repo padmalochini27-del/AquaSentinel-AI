@@ -210,7 +210,67 @@ def seed_historical_incidents():
             "available": False,
             "message": f"Qdrant seed error: {str(e)}"
         }
+def store_incident_memory(
+    flow,
+    pressure,
+    incident_type,
+    severity,
+    zone,
+    anomaly_score
+):
+    client = get_qdrant_client()
 
+    if client is None:
+        return {
+            "available": False,
+            "message": "Qdrant is not configured."
+        }
+
+    collection_name = "aquasentinel_incidents"
+
+    vector = create_sensor_vector(flow, pressure)
+
+    try:
+        # Generate a unique point ID
+        import uuid
+
+        point_id = str(uuid.uuid4())
+
+        point = models.PointStruct(
+            id=point_id,
+            vector={
+                "sensor_vector": vector
+            },
+            payload={
+                "flow_lpm": flow,
+                "pressure_bar": pressure,
+                "incident_type": incident_type,
+                "severity": severity,
+                "zone": zone,
+                "anomaly_score": anomaly_score,
+                "source": "AquaSentinel AI"
+            }
+        )
+
+        client.upsert(
+            collection_name=collection_name,
+            points=[point]
+        )
+
+        return {
+            "available": True,
+            "stored": True,
+            "incident_type": incident_type,
+            "severity": severity,
+            "message": "Incident stored successfully in Qdrant."
+        }
+
+    except Exception as e:
+        return {
+            "available": False,
+            "stored": False,
+            "message": f"Qdrant write-back error: {str(e)}"
+        }
 
 def retrieve_historical_context(flow, pressure):
     """
