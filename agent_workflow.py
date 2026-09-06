@@ -127,6 +127,89 @@ def create_sensor_vector(flow, pressure):
     ]
 
     return vector
+def seed_historical_incidents():
+    client = get_qdrant_client()
+
+    if client is None:
+        return {
+            "available": False,
+            "message": "Qdrant is not configured."
+        }
+
+    collection_name = "aquasentinel_incidents"
+
+    incidents = [
+        {
+            "flow": 88,
+            "pressure": 1.7,
+            "type": "Pipeline Leak",
+            "severity": "CRITICAL",
+            "zone": "Zone A"
+        },
+        {
+            "flow": 82,
+            "pressure": 1.9,
+            "type": "Pressure Drop",
+            "severity": "HIGH",
+            "zone": "Zone A"
+        },
+        {
+            "flow": 76,
+            "pressure": 2.1,
+            "type": "High Flow Event",
+            "severity": "MEDIUM",
+            "zone": "Zone B"
+        },
+        {
+            "flow": 43,
+            "pressure": 3.4,
+            "type": "Normal Operation",
+            "severity": "LOW",
+            "zone": "Zone A"
+        }
+    ]
+
+    points = []
+
+    for i, incident in enumerate(incidents):
+
+        vector = create_sensor_vector(
+            incident["flow"],
+            incident["pressure"]
+        )
+
+        points.append(
+            models.PointStruct(
+                id=i + 1,
+                vector={
+                    "sensor_vector": vector
+                },
+                payload={
+                    "flow_lpm": incident["flow"],
+                    "pressure_bar": incident["pressure"],
+                    "incident_type": incident["type"],
+                    "severity": incident["severity"],
+                    "zone": incident["zone"]
+                }
+            )
+        )
+
+    try:
+        client.upsert(
+            collection_name=collection_name,
+            points=points
+        )
+
+        return {
+            "available": True,
+            "message": f"{len(points)} historical incidents stored in Qdrant."
+        }
+
+    except Exception as e:
+        return {
+            "available": False,
+            "message": f"Qdrant seed error: {str(e)}"
+        }
 
 
 def retrieve_historical_context(flow, pressure):
