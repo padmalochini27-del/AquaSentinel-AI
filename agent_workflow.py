@@ -487,21 +487,50 @@ def run_aquasentinel_workflow(flow, pressure):
     )
 
     if conflict:
-        final_status = "HUMAN REVIEW REQUIRED"
-    elif not enkrypt_result["safe"]:
-        final_status = "BLOCKED BY SECURITY GUARDRAIL"
-    elif ml_result["anomaly"] or rule_result["status"] == "ALERT":
-        final_status = "LEAK / ANOMALY DETECTED"
-    else:
-        final_status = "NORMAL"
+    final_status = "HUMAN REVIEW REQUIRED"
+elif not enkrypt_result["safe"]:
+    final_status = "BLOCKED BY SECURITY GUARDRAIL"
+elif ml_result["anomaly"] or rule_result["status"] == "ALERT":
+    final_status = "LEAK / ANOMALY DETECTED"
+else:
+    final_status = "NORMAL"
+
+
+# -----------------------------
+# QDRANT MEMORY WRITE-BACK
+# -----------------------------
+
+memory_write = {
+    "available": False,
+    "stored": False,
+    "message": "No incident stored."
+}
+
+if final_status == "LEAK / ANOMALY DETECTED":
+
+    incident_type = "Pipeline Leak"
+    severity = "CRITICAL"
+
+    if rule_result["status"] == "ALERT":
+        severity = "CRITICAL"
+
+    memory_write = store_incident_memory(
+        flow=flow,
+        pressure=pressure,
+        incident_type=incident_type,
+        severity=severity,
+        zone="Zone A",
+        anomaly_score=ml_result["anomaly_score"]
+    )
 
     return {
-        "sensor_data": sensor_data,
-        "ml_result": ml_result,
-        "rule_result": rule_result,
-        "conflict": conflict,
-        "qdrant_memory": memory,
-        "lyzr": lyzr_result,
-        "enkrypt": enkrypt_result,
-        "final_status": final_status
+      "sensor_data": sensor_data,
+      "ml_result": ml_result,
+      "rule_result": rule_result,
+      "memory_write": memory_write,
+      "conflict": conflict,
+      "qdrant_memory": memory,
+      "lyzr": lyzr_result,
+      "enkrypt": enkrypt_result,
+      "final_status": final_status
     }
